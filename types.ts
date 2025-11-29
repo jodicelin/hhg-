@@ -44,19 +44,19 @@ export const COLORS = [
   "紅色", "綠色", "黃色", "橘色", "藍色", "金色", "粉紅色", "黑色", "白色", "咖啡色", "紫色"
 ];
 
-// Map for displaying tags and pickers
+// Map for displaying tags and pickers - Updated to Morandi Tones
 export const COLOR_HEX_MAP: {[key: string]: string} = {
-  '紅色': '#ef4444', 
-  '綠色': '#22c55e', 
-  '黃色': '#eab308', 
-  '橘色': '#f97316',
-  '藍色': '#3b82f6', 
-  '金色': '#ca8a04', 
-  '粉紅色': '#ec4899', 
-  '黑色': '#000000',
-  '白色': '#9ca3af', // Using a greyish tone so white text is visible
-  '咖啡色': '#78350f', 
-  '紫色': '#a855f7'
+  '紅色': '#d48a8a', // Morandi Red
+  '綠色': '#9fb5a7', // Morandi Green
+  '黃色': '#e3d0a4', // Morandi Yellow
+  '橘色': '#dcb394', // Morandi Orange
+  '藍色': '#9baec8', // Morandi Blue
+  '金色': '#c5b698', // Morandi Gold
+  '粉紅色': '#dcaab6', // Morandi Pink
+  '黑色': '#5e5e5e', // Morandi Black (Dark Grey)
+  '白色': '#d1d5db', // Morandi White (Greyish to be visible)
+  '咖啡色': '#a69082', // Morandi Brown
+  '紫色': '#bdaacd'  // Morandi Purple
 };
 
 export const HOLIDAYS = [

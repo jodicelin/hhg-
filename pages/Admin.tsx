@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
 import { Plus, Edit2, Sheet, HelpCircle, Check, LogOut, Database, Copy } from 'lucide-react';
 import { PortfolioItem } from '../types';
 import AdminModal from '../components/AdminModal';
-import { createItem, updateItem, deleteItem, getSheetUrl, setSheetUrl, GOOGLE_APPS_SCRIPT_CODE } from '../services/googleSheetsService';
+import { createItem, createBatchItems, updateItem, deleteItem, getSheetUrl, setSheetUrl, GOOGLE_APPS_SCRIPT_CODE } from '../services/googleSheetsService';
 
 interface AdminProps {
   items: PortfolioItem[];
@@ -28,12 +29,17 @@ const Admin: React.FC<AdminProps> = ({ items, refreshData, onLogout }) => {
     setIsModalOpen(true);
   };
 
-  const handleSaveItem = async (item: PortfolioItem) => {
-    // Optimistic refresh happens inside service, but we trigger a UI reload here too
-    if (selectedItem) {
-      await updateItem(item);
+  const handleSaveItems = async (itemsToSave: PortfolioItem[]) => {
+    // If editing, itemsToSave has 1 item and selectedItem is not null
+    if (selectedItem && itemsToSave.length === 1) {
+      await updateItem(itemsToSave[0]);
     } else {
-      await createItem(item);
+      // Creation mode: could be 1 or multiple
+      if (itemsToSave.length === 1) {
+        await createItem(itemsToSave[0]);
+      } else if (itemsToSave.length > 1) {
+        await createBatchItems(itemsToSave);
+      }
     }
     refreshData();
   };
@@ -137,8 +143,8 @@ const Admin: React.FC<AdminProps> = ({ items, refreshData, onLogout }) => {
                         <div className="mt-4 text-xs text-gray-600 space-y-3 bg-gray-50 p-3 rounded-lg border border-gray-200">
                             <p className="leading-5">
                                 <strong>1. 建立試算表標題 (第一列):</strong><br/>
-                                <code className="text-indigo-600 bg-indigo-50 px-1 break-all">id, title, description, imageUrl, category, link, dateCreated, majorCategory, type, color, holiday</code>
-                                <br/><span className="text-[10px] text-gray-400">(共 11 欄)</span>
+                                <code className="text-indigo-600 bg-indigo-50 px-1 break-all">id, imageUrl, majorCategory, type, dateCreated, holiday, color</code>
+                                <br/><span className="text-[10px] text-gray-400">(共 7 欄)</span>
                             </p>
                             
                             <div>
@@ -178,7 +184,10 @@ const Admin: React.FC<AdminProps> = ({ items, refreshData, onLogout }) => {
                             
                             <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                    <h4 className="font-bold text-gray-900 truncate mr-2">{item.title}</h4>
+                                    <h4 className={`font-bold truncate mr-2 text-gray-400 italic`}>
+                                      (無標題)
+                                    </h4>
+                                    
                                     {item.majorCategory && (
                                       <span className="text-[10px] uppercase tracking-wider font-semibold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">
                                           {item.majorCategory}
@@ -190,7 +199,9 @@ const Admin: React.FC<AdminProps> = ({ items, refreshData, onLogout }) => {
                                       </span>
                                     )}
                                 </div>
-                                <p className="text-sm text-gray-500 truncate">{item.description}</p>
+                                <p className="text-sm text-gray-500 truncate">
+                                  {item.dateCreated}
+                                </p>
                             </div>
 
                             <button 
@@ -223,7 +234,7 @@ const Admin: React.FC<AdminProps> = ({ items, refreshData, onLogout }) => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         initialItem={selectedItem}
-        onSave={handleSaveItem}
+        onSave={handleSaveItems}
         onDelete={handleDeleteItem}
       />
     </div>

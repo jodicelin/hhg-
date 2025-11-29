@@ -21,14 +21,22 @@ const Home: React.FC<HomeProps> = ({ items, isLoading, searchTerm }) => {
 
   // Advanced Filter Logic
   const filteredItems = useMemo(() => {
+    if (!items || !Array.isArray(items)) return [];
+    
     return items.filter(item => {
       // 1. Text Search (passed from Navbar)
-      const term = searchTerm.toLowerCase();
+      const term = (searchTerm || '').toLowerCase();
+      // Ensure fields exist before calling toLowerCase
+      const title = (item.title || '').toLowerCase();
+      const desc = (item.description || '').toLowerCase();
+      const cat = (item.category || '').toLowerCase();
+      const major = (item.majorCategory || '').toLowerCase();
+
       const matchesSearch = !term || 
-        (item.title || '').toLowerCase().includes(term) ||
-        (item.description || '').toLowerCase().includes(term) ||
-        (item.category || '').toLowerCase().includes(term) ||
-        (item.majorCategory || '').toLowerCase().includes(term);
+        title.includes(term) ||
+        desc.includes(term) ||
+        cat.includes(term) ||
+        major.includes(term);
 
       // 2. Major Category
       const matchesCategory = selectedCategory === 'All' || item.majorCategory === selectedCategory;
@@ -180,43 +188,47 @@ const Home: React.FC<HomeProps> = ({ items, isLoading, searchTerm }) => {
         )}
       </div>
 
-      {/* Lightbox / Modal */}
+      {/* Lightbox / Modal - Scrollable Container */}
       {lightboxItem && (
         <div 
-          className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-md overflow-y-auto animate-fade-in"
           onClick={() => setLightboxItem(null)}
         >
+          {/* Close Button fixed to viewport */}
           <button 
             onClick={() => setLightboxItem(null)}
-            className="absolute top-4 right-4 text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+            className="fixed top-6 right-6 z-[110] text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
           >
             <X size={32} />
           </button>
 
-          <div 
-            className="relative max-w-7xl max-h-[90vh] w-full flex flex-col items-center"
-            onClick={(e) => e.stopPropagation()}
-          >
-             {isVideo(lightboxItem.imageUrl) ? (
-                <video 
-                   src={lightboxItem.imageUrl} 
-                   className="max-w-full max-h-[85vh] rounded-lg shadow-2xl outline-none" 
-                   controls 
-                   autoPlay 
-                />
-             ) : (
-                <img 
-                  src={lightboxItem.imageUrl} 
-                  alt={lightboxItem.title} 
-                  className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
-                />
-             )}
-             <div className="mt-4 text-center">
-                <h2 className="text-white text-xl font-bold">{lightboxItem.title}</h2>
-                <div className="flex gap-2 justify-center mt-2">
-                   {lightboxItem.majorCategory && <span className="text-xs bg-white/20 text-white px-2 py-1 rounded">{lightboxItem.majorCategory}</span>}
-                   {lightboxItem.type && <span className="text-xs bg-white/20 text-white px-2 py-1 rounded">{lightboxItem.type}</span>}
-                </div>
+          <div className="min-h-full flex flex-col items-center justify-center p-4 md:p-12">
+             <div 
+                className="relative max-w-5xl w-full flex flex-col items-center"
+                onClick={(e) => e.stopPropagation()}
+             >
+                 {isVideo(lightboxItem.imageUrl) ? (
+                    <video 
+                       src={lightboxItem.imageUrl} 
+                       className="max-w-full rounded-lg shadow-2xl outline-none" 
+                       controls 
+                       autoPlay 
+                    />
+                 ) : (
+                    <img 
+                      src={lightboxItem.imageUrl} 
+                      alt={lightboxItem.title} 
+                      // Removed max-h constraint to allow full height scrolling for EDMs
+                      className="w-full h-auto object-contain rounded-lg shadow-2xl bg-gray-900"
+                    />
+                 )}
+                 <div className="mt-6 text-center pb-10">
+                    <h2 className="text-white text-2xl font-bold tracking-tight">{lightboxItem.title}</h2>
+                    <div className="flex gap-2 justify-center mt-3">
+                       {lightboxItem.majorCategory && <span className="text-sm font-medium bg-white/10 border border-white/20 text-white px-3 py-1 rounded-full">{lightboxItem.majorCategory}</span>}
+                       {lightboxItem.type && <span className="text-sm font-medium bg-white/10 border border-white/20 text-white px-3 py-1 rounded-full">{lightboxItem.type}</span>}
+                    </div>
+                 </div>
              </div>
           </div>
         </div>
