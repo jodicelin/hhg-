@@ -7,8 +7,15 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
+        darkMode: 'class', // Enable class-based dark mode
         theme: {
           extend: {
+            colors: {
+              'brand-yellow': '#FFBD59', // Mustard Yellow
+              'brand-bg': '#F9F9F9',     // Light Mode BG
+              'brand-black': '#121212',  // Deep Black / Dark Mode BG
+              'brand-dark-card': '#1E1E1E', // Dark Mode Card BG
+            },
             fontFamily: {
               sans: ['Inter', 'sans-serif'],
             },
@@ -25,12 +32,18 @@
         },
       };
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-      body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+      body { font-family: 'Inter', sans-serif; }
       /* Hide scrollbar for clean modal look */
       .no-scrollbar::-webkit-scrollbar { display: none; }
       .no-scrollbar { -ms-overflow-style: none;  scrollbar-width: none; }
+      
+      /* Smooth theme transition */
+      html, body, div, button, input, select {
+        transition-property: background-color, border-color, color;
+        transition-duration: 300ms;
+      }
     </style>
   <script type="importmap">
 {
@@ -43,7 +56,7 @@
 }
 </script>
 </head>
-  <body>
+  <body class="bg-brand-bg text-brand-black dark:bg-brand-black dark:text-brand-bg transition-colors duration-300">
     <div id="root"></div>
   </body>
 </html>

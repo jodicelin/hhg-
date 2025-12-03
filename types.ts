@@ -10,7 +10,7 @@ export interface PortfolioItem {
   color?: string; // 顏色 (Comma separated string for multiple colors)
   holiday?: string; // 節日
   link?: string;
-  dateCreated: string;
+  date: string; // 合併後的日期 (YYYY-MM)
 }
 
 export interface SheetResponse {

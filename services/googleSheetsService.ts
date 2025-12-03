@@ -1,4 +1,3 @@
-
 import { PortfolioItem } from '../types';
 
 /**
@@ -8,6 +7,26 @@ import { PortfolioItem } from '../types';
  */
 
 export const GOOGLE_APPS_SCRIPT_CODE = `
+// VERSION: v13_strict_test_mode
+// Update Date: 2025-05-23
+// IMPORTANT: Please select "New Version" when deploying!
+
+// ----------------------------------------------------------------
+// 1. TEST FUNCTION (Run this in editor to check permissions)
+// Select 'test' from the dropdown above and click 'Run'
+// ----------------------------------------------------------------
+function test() {
+  try {
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+    console.log("Connection successful!");
+    console.log("Sheet Name: " + sheet.getName());
+    console.log("Last Row: " + sheet.getLastRow());
+    console.log("If you see this, the script works. Now deploy as Web App.");
+  } catch (e) {
+    console.error("Error accessing sheet: " + e.toString());
+  }
+}
+
 function doGet(e) {
   return handleRequest(e);
 }
@@ -17,13 +36,22 @@ function doPost(e) {
 }
 
 function handleRequest(e) {
+  // 2. SAFETY CHECK FOR MANUAL RUNS
+  // This prevents the script from crashing if you accidentally run doGet/doPost in the editor
+  if (!e) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: 'error', 
+      message: 'No event object detected. Do not run doGet/doPost directly in the editor. Use the test() function for checking permissions, or deploy as Web App to use.'
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+
   const lock = LockService.getScriptLock();
-  lock.tryLock(10000);
+  lock.tryLock(5000);
   
   try {
     const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
     
-    // SAFE PARSING: Handle both GET parameters and POST body
+    // SAFE PARSING
     let params = {};
     if (e.parameter && e.parameter.action) {
       params = e.parameter;
@@ -37,53 +65,53 @@ function handleRequest(e) {
 
     const action = params.action || 'read';
     
+    // 3. STRICT 7-COLUMN MAPPING
+    // A: id, B: imageUrl, C: majorCategory, D: type, E: date, F: holiday, G: color
+    
+    function formatRow(d) {
+      // Ensure EVERY field is mapped to a string, even if empty.
+      return [
+        String(d.id || ''), 
+        String(d.imageUrl || ''), 
+        String(d.majorCategory || ''), 
+        String(d.type || ''), 
+        "'" + String(d.date || ''), // Force string for Date
+        String(d.holiday || ''),    // Explicitly handle empty holiday
+        String(d.color || '')       // Explicitly handle empty color
+      ];
+    }
+
     // 1. READ ACTION
     if (action === 'read') {
-      const data = sheet.getDataRange().getValues();
-      if (data.length < 2) return createJSONOutput([]); // Only headers or empty
-      
-      const headers = data[0].map(h => String(h).toLowerCase());
+      const lastRow = sheet.getLastRow();
+      if (lastRow < 2) return createJSONOutput([]); 
+
+      // Get all data (Force read 7 columns)
+      const data = sheet.getRange(1, 1, lastRow, 7).getValues();
+      const headers = data[0].map(function(h) { return String(h).toLowerCase().trim(); });
       const rows = data.slice(1);
       
-      const result = rows.map(row => {
+      const result = rows.map(function(row) {
         let obj = {};
-        headers.forEach((h, i) => {
+        headers.forEach(function(h, i) {
            let val = row[i];
-           // Handle Date objects from Sheet (convert to YYYY-MM)
-           if (val instanceof Date) {
-              const y = val.getFullYear();
-              const m = String(val.getMonth() + 1).padStart(2, '0');
-              val = y + '-' + m;
-           }
-           obj[h] = String(val); // Force string
+           obj[h] = (val === undefined || val === null) ? "" : String(val);
         });
         return obj;
       });
-      return createJSONOutput(result);
+      
+      const cleanResult = result.filter(function(item) {
+        return item.id && String(item.id).trim() !== "";
+      });
+
+      return createJSONOutput(cleanResult);
     }
-    
-    // CONSTANT: Column Order for Writes
-    // Column 1: id
-    // Column 2: imageUrl
-    // Column 3: majorCategory
-    // Column 4: type
-    // Column 5: dateCreated
-    // Column 6: holiday
-    // Column 7: color
-    
+
     // 2. CREATE (Single)
     if (action === 'create') {
       const d = params.data;
-      const row = [
-        d.id, 
-        d.imageUrl, 
-        d.majorCategory || '', 
-        d.type || '', 
-        "'" + (d.dateCreated || ''), // Force string format
-        d.holiday || '',
-        d.color || ''
-      ];
-      sheet.appendRow(row);
+      if (!d) return createJSONOutput({status: 'error', message: 'No data provided'});
+      sheet.appendRow(formatRow(d));
       return createJSONOutput({status: 'success'});
     }
 
@@ -93,20 +121,9 @@ function handleRequest(e) {
       if (!Array.isArray(items)) {
          return createJSONOutput({status: 'error', message: 'Data is not an array'});
       }
-      
-      const rowsToAdd = items.map(d => [
-        d.id, 
-        d.imageUrl, 
-        d.majorCategory || '', 
-        d.type || '', 
-        "'" + (d.dateCreated || ''), 
-        d.holiday || '',
-        d.color || ''
-      ]);
-      
+      const rowsToAdd = items.map(formatRow);
       if (rowsToAdd.length > 0) {
         const lastRow = sheet.getLastRow();
-        // getRange(row, column, numRows, numColumns)
         const range = sheet.getRange(lastRow + 1, 1, rowsToAdd.length, 7);
         range.setValues(rowsToAdd);
       }
@@ -117,21 +134,10 @@ function handleRequest(e) {
     if (action === 'update') {
       const d = params.data;
       const data = sheet.getDataRange().getValues();
-      
-      // Loop to find ID (Assuming ID is in Column A / Index 0)
       for(let i=1; i<data.length; i++) {
-        // String comparison to be safe
         if(String(data[i][0]) === String(d.id)) {
           const range = sheet.getRange(i+1, 1, 1, 7);
-          range.setValues([[
-            d.id, 
-            d.imageUrl, 
-            d.majorCategory || '', 
-            d.type || '', 
-            "'" + (d.dateCreated || ''), 
-            d.holiday || '',
-            d.color || ''
-          ]]);
+          range.setValues([formatRow(d)]);
           return createJSONOutput({status: 'success'});
         }
       }
@@ -142,7 +148,6 @@ function handleRequest(e) {
     if (action === 'delete') {
       const id = params.id;
       const data = sheet.getDataRange().getValues();
-      
       for(let i=1; i<data.length; i++) {
         if(String(data[i][0]) === String(id)) {
            sheet.deleteRow(i+1); 
@@ -167,77 +172,26 @@ function createJSONOutput(data) {
 }
 `;
 
-const STORAGE_KEY = 'portfolio_data';
+// Increment version to force local storage reset
+const STORAGE_KEY = 'portfolio_data_v13_strict'; 
 const SETTINGS_KEY = 'portfolio_settings';
 const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycby_Xpppo6UDhRmMFDYVPn3dxBvPBthT1a3ERNTQLxmLALkOIOPr2aW1TCbIEt0S_1LQ/exec';
+const DATA_VERSION = 'v13_strict_test'; 
 
-// Initial Mock Data with Chinese content - Cleaned up to match 7 fields
+// Initial Mock Data (Fallback)
 const INITIAL_DATA: PortfolioItem[] = [
   {
     id: '1',
-    title: '', 
-    description: '', 
+    title: '', description: '', 
     imageUrl: 'https://images.unsplash.com/photo-1529236183275-4fdcf2bc987e?q=80&w=800&auto=format&fit=crop',
-    category: '', 
-    majorCategory: '美妝個清',
-    type: 'BN',
-    color: '黃色',
-    holiday: '',
-    dateCreated: '2023-06',
-    link: '' 
+    category: '', majorCategory: '美妝個清', type: 'BN', color: '黃色', holiday: '', date: '2023-06', link: '' 
   },
   {
     id: '2',
-    title: '',
-    description: '',
+    title: '', description: '', 
     imageUrl: 'https://images.unsplash.com/photo-1548655299-a864e240b2e2?q=80&w=800&auto=format&fit=crop',
-    category: '', 
-    majorCategory: '保健/食品',
-    type: 'EDM',
-    color: '紅色',
-    holiday: '新年',
-    dateCreated: '2023-12',
-    link: ''
-  },
-  {
-    id: '3',
-    title: '',
-    description: '',
-    imageUrl: 'https://images.unsplash.com/photo-1585771724684-382054863d61?q=80&w=800&auto=format&fit=crop',
-    category: '', 
-    majorCategory: '家電',
-    type: '廣告',
-    color: '白色',
-    holiday: '',
-    dateCreated: '2024-01',
-    link: ''
-  },
-  {
-    id: '4',
-    title: '',
-    description: '',
-    imageUrl: 'https://images.unsplash.com/photo-1526738549149-8e07eca6c147?q=80&w=800&auto=format&fit=crop',
-    category: '', 
-    majorCategory: '3C產品',
-    type: '組圖框',
-    color: '藍色',
-    holiday: '雙11',
-    dateCreated: '2023-11',
-    link: ''
-  },
-  {
-    id: '5',
-    title: '',
-    description: '',
-    imageUrl: 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?q=80&w=800&auto=format&fit=crop',
-    category: '', 
-    majorCategory: '美妝個清',
-    type: '廣告',
-    color: '粉紅色',
-    holiday: '婦女節',
-    dateCreated: '2024-03',
-    link: ''
-  },
+    category: '', majorCategory: '保健/食品', type: 'EDM', color: '紅色', holiday: '新年', date: '2023-12', link: ''
+  }
 ];
 
 export const getSheetUrl = (): string => {
@@ -272,6 +226,13 @@ const normalizeData = (data: any[]): PortfolioItem[] => {
       lowerCased[key.toLowerCase()] = row[key];
     });
 
+    let finalDate = String(lowerCased.date || '');
+    if (!finalDate) {
+        const y = lowerCased.year;
+        const m = lowerCased.mon;
+        if (y && m) finalDate = `${y}-${m}`;
+    }
+
     return {
       id: String(lowerCased.id || safeUUID()),
       title: String(lowerCased.title || ''),
@@ -282,132 +243,128 @@ const normalizeData = (data: any[]): PortfolioItem[] => {
       type: String(lowerCased.type || ''),
       color: String(lowerCased.color || ''),
       holiday: String(lowerCased.holiday || ''),
-      dateCreated: String(lowerCased.datecreated || ''),
+      date: finalDate,
       link: String(lowerCased.link || '')
     };
   }).filter((item): item is PortfolioItem => item !== null);
 };
 
 export const fetchItems = async (): Promise<PortfolioItem[]> => {
+  const currentVersion = localStorage.getItem('data_version');
+  if (currentVersion !== DATA_VERSION) {
+    console.log("New version detected, clearing old local data...");
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.setItem('data_version', DATA_VERSION);
+  }
+
   const sheetUrl = getSheetUrl();
   
   if (sheetUrl) {
     try {
-      const response = await fetch(`${sheetUrl}?action=read`, { redirect: 'follow' });
-      const rawData = await response.json();
-      
-      if (Array.isArray(rawData)) {
-        const normalizedData = normalizeData(rawData);
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedData));
-        } catch (storageError) {
-          console.warn("Could not save to local storage", storageError);
+      const response = await fetch(`${sheetUrl}?action=read`, { 
+        redirect: 'follow',
+        credentials: 'omit'
+      });
+      if (response.ok) {
+        const rawData = await response.json();
+        if (Array.isArray(rawData)) {
+          const normalizedData = normalizeData(rawData);
+          try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizedData));
+          } catch (storageError) {
+            console.warn("Could not save to local storage", storageError);
+          }
+          return normalizedData;
         }
-        return normalizedData;
       }
     } catch (e) {
-      console.warn("Failed to fetch from Google Sheet, falling back to local storage.", e);
+      console.warn("Failed to fetch from Google Sheet", e);
     }
   }
 
   try {
     const local = localStorage.getItem(STORAGE_KEY);
     if (!local) {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_DATA));
-      } catch (storageError) {}
       return INITIAL_DATA;
     }
     return JSON.parse(local);
   } catch (e) {
-    console.error("Local storage error, resetting data", e);
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(INITIAL_DATA));
-    } catch (storageError) {}
+    console.error("Local storage error", e);
     return INITIAL_DATA;
   }
 };
 
 export const createItem = async (item: PortfolioItem): Promise<void> => {
   const sheetUrl = getSheetUrl();
-  
+  const cleanItem = JSON.parse(JSON.stringify(item));
+
   const items = await fetchItems(); 
-  const newItems = [item, ...items];
+  const newItems = [cleanItem, ...items];
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newItems));
   } catch (e) {}
 
   if (sheetUrl) {
     try {
-      // Use text/plain to avoid CORS preflight, redirect: follow for GAS
       await fetch(sheetUrl, {
         method: 'POST',
-        headers: {
-          "Content-Type": "text/plain",
-        },
-        body: JSON.stringify({ action: 'create', data: item }),
-        redirect: 'follow'
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: 'create', data: cleanItem }),
+        redirect: 'follow',
+        credentials: 'omit'
       });
     } catch (e) {
       console.error("Sync create error", e);
-      throw e;
     }
   }
 };
 
-// Batch Create Items
 export const createBatchItems = async (batchItems: PortfolioItem[]): Promise<void> => {
   const sheetUrl = getSheetUrl();
+  const cleanItems = JSON.parse(JSON.stringify(batchItems));
   
-  // 1. Optimistic
   const currentItems = await fetchItems();
-  const newItems = [...batchItems, ...currentItems];
+  const newItems = [...cleanItems, ...currentItems];
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newItems));
   } catch (e) {}
 
-  // 2. Sync
   if (sheetUrl) {
     try {
-      // Use text/plain to avoid CORS preflight, redirect: follow for GAS
       await fetch(sheetUrl, {
         method: 'POST',
-        headers: {
-          "Content-Type": "text/plain",
-        },
-        body: JSON.stringify({ action: 'createBatch', data: batchItems }),
-        redirect: 'follow'
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: 'createBatch', data: cleanItems }),
+        redirect: 'follow',
+        credentials: 'omit'
       });
     } catch (e) {
       console.error("Sync batch create error", e);
-      throw e;
     }
   }
 }
 
 export const updateItem = async (updatedItem: PortfolioItem): Promise<void> => {
   const sheetUrl = getSheetUrl();
+  const cleanItem = JSON.parse(JSON.stringify(updatedItem));
 
   const items = await fetchItems();
-  const newItems = items.map(i => i.id === updatedItem.id ? updatedItem : i);
+  const newItems = items.map(i => i.id === cleanItem.id ? cleanItem : i);
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newItems));
   } catch (e) {}
 
   if (sheetUrl) {
     try {
-      // Use text/plain to avoid CORS preflight, redirect: follow for GAS
       await fetch(sheetUrl, {
         method: 'POST',
-        headers: {
-          "Content-Type": "text/plain",
-        },
-        body: JSON.stringify({ action: 'update', data: updatedItem }),
-        redirect: 'follow'
+        headers: { "Content-Type": "text/plain" },
+        body: JSON.stringify({ action: 'update', data: cleanItem }),
+        redirect: 'follow',
+        credentials: 'omit'
       });
     } catch (e) {
       console.error("Sync update error", e);
-      throw e;
     }
   }
 };
@@ -423,18 +380,15 @@ export const deleteItem = async (id: string): Promise<void> => {
 
   if (sheetUrl) {
     try {
-      // Use text/plain to avoid CORS preflight, redirect: follow for GAS
       await fetch(sheetUrl, {
         method: 'POST',
-        headers: {
-          "Content-Type": "text/plain",
-        },
+        headers: { "Content-Type": "text/plain" },
         body: JSON.stringify({ action: 'delete', id: id }),
-        redirect: 'follow'
+        redirect: 'follow',
+        credentials: 'omit'
       });
     } catch (e) {
       console.error("Sync delete error", e);
-      throw e;
     }
   }
 };
